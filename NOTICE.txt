@@ -1,0 +1,7 @@
+DataSure
+Copyright (c) 2024 Sagar Kusuma
+
+This project uses the following open-source libraries:
+- Pydantic (MIT License) — https://github.com/pydantic/pydantic
+- Typer (MIT License) — https://github.com/tiangolo/typer
+- pytest (MIT License) — https://github.com/pytest-dev/pytest

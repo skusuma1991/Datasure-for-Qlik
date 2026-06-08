@@ -1,10 +1,10 @@
-# DataSure — Analytics QA Platform for Qlik Sense
+# DataSure
 
-> Automated quality assurance, validation and reporting for Qlik Sense applications — on-premises, cloud, or demo mode with no server required.
+> Automated QA platform for Qlik Sense applications — on-premises, cloud, or demo mode with no server required.
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Platform: Qlik Sense](https://img.shields.io/badge/platform-Qlik%20Sense-009845.svg)](https://qlik.com)
+[![Qlik Sense](https://img.shields.io/badge/works%20with-Qlik%20Sense-009845.svg)](https://qlik.com)
 
 ---
 
@@ -332,6 +332,12 @@ datasure/
 | Phase 3 | ✅ Complete | Performance analysis (PERF), Load Script analysis (LS), Resource Optimization (RO) |
 | Phase 4 | ✅ Complete | Plugin architecture — entry_points + local `plugins_dir`, naming convention example |
 | Phase 5 | Planned | Tableau and Power BI connectors |
+
+---
+
+## Disclaimer
+
+> DataSure is an independent open-source project and is **not** affiliated with, endorsed by, sponsored by, or associated with QlikTech International AB or Qlik Technologies Inc. "Qlik" and "Qlik Sense" are registered trademarks of QlikTech International AB.
 
 ---
 

@@ -34,9 +34,13 @@ class DuplicateExpressionValidator(BaseValidator):
     """
 
     name = "duplicates"
+    is_stateful = True
 
     def __init__(self) -> None:
         self._variables: dict[str, str] = {}
+
+    def prime_context(self, objects, data_model, master_items, variables) -> None:
+        self.prime(variables)
 
     def prime(self, variables: list[dict]) -> None:
         for v in variables:

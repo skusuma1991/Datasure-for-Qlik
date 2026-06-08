@@ -80,8 +80,11 @@ class FieldIntegrityValidator(BaseValidator):
         self._master_items: dict[str, str] = {}  # id -> name
         self._variables: dict[str, str] = {}     # name -> expression
 
+    def prime_context(self, objects, data_model, master_items, variables) -> None:
+        self.prime(data_model, master_items, variables)
+
     def prime(self, data_model: dict[str, Any], master_items: list[dict], variables: list[dict]) -> None:
-        """Call before validate() to supply the app's data model context."""
+        """Supply the app's data model context before validate() calls."""
         for table in data_model.get("tables", []):
             for field in table.get("fields", []):
                 name = field.get("name", "").lower()

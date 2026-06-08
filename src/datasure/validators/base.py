@@ -42,10 +42,24 @@ class ValidationResult:
 
 class BaseValidator(ABC):
     name: str = "base"
+    is_stateful: bool = False  # set True for cross-object validators
+
+    def prime_context(
+        self,
+        objects: list[dict[str, Any]],
+        data_model: dict[str, Any],
+        master_items: list[dict[str, Any]],
+        variables: list[dict[str, Any]],
+    ) -> None:
+        """Called once before any validate() calls — override to initialise state."""
 
     @abstractmethod
     def validate(self, obj: dict[str, Any]) -> list[ValidationResult]:
-        """Run validation against a platform object dict and return results."""
+        """Validate a single object. Stateful validators may return [] here."""
+
+    def validate_all(self, objects: list[dict[str, Any]]) -> list[ValidationResult]:
+        """Called after all per-object passes. Override in stateful validators."""
+        return []
 
     def _issue(
         self,

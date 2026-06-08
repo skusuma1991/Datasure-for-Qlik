@@ -60,6 +60,12 @@ Groups of identical or near-identical expressions across measures and visualizat
 
 ![Duplicates Page](screenshots/06-duplicates.png)
 
+### 7. Performance & Optimization *(Phase 3)*
+
+Three analysis dimensions in one page: expression performance issues, load script anti-patterns, and resource optimization recommendations.
+
+![Performance Page](screenshots/09-performance.png)
+
 ---
 
 ## CLI Commands
@@ -88,6 +94,10 @@ datasure version           Show version information
 | **Field Integrity** | FI001–FI010 | Unknown field references, key fields in expressions, deleted master item references |
 | **Data Model Health** | DM001–DM021 | Synthetic keys, circular references, unused tables, low field coverage |
 | **Duplicate Expressions** | DUP001 | Identical or normalised-equivalent expressions across measures/charts |
+| **Performance** *(Phase 3)* | PERF001–PERF005 | Overcrowded sheets, nested Aggr(), P()/E() set functions, large app scale |
+| **Load Script** *(Phase 3)* | LS001–LS005 | Direct SQL loads, INLINE data, LOAD *, orphaned tables, undocumented sections |
+| **Resource Optimization** *(Phase 3)* | RO001–RO004 | Missing master items, unused variables, low master item adoption rate |
+| **Plugin Validators** *(Phase 4)* | Custom | Any custom rule — drop a `.py` file in `plugins_dir` or register via entry_points |
 
 ---
 
@@ -209,6 +219,54 @@ qlik:
 
 ---
 
+## Plugin System (Phase 4)
+
+DataSure supports custom validator plugins. Two distribution methods:
+
+### Option 1 — Local plugin file
+
+1. Create a `.py` file in any directory:
+
+```python
+from datasure.plugins import datasure_plugin
+from datasure.validators.base import BaseValidator, Severity, ValidationResult
+
+@datasure_plugin
+class NamingConventionValidator(BaseValidator):
+    name = "naming_convention"
+
+    def validate(self, obj):
+        if obj.get("type") == "measure" and not obj.get("name","").startswith("m_"):
+            return [ValidationResult(
+                validator_name=self.name, object_type="measure",
+                object_id=obj.get("id",""), passed=True,
+                issues=[self._issue("NC001", Severity.INFO, "Name should start with m_", obj)],
+            )]
+        return []
+```
+
+2. Configure `plugins_dir` in your config:
+
+```yaml
+validation:
+  plugins_dir: ~/datasure-plugins
+  enabled_modules:
+    - syntax
+    - naming_convention   # your plugin name
+```
+
+### Option 2 — Python package (shareable)
+
+```toml
+# pyproject.toml
+[project.entry-points."datasure.validators"]
+naming_convention = "mypackage.validators:NamingConventionValidator"
+```
+
+An example plugin lives at `src/datasure/plugins/examples/naming_convention.py`.
+
+---
+
 ## Project Structure
 
 ```
@@ -271,8 +329,8 @@ datasure/
 |---|---|---|
 | Phase 1 | ✅ Complete | Syntax, Data Types, Field Integrity, Data Model Health, Duplicates |
 | Phase 2 | ✅ Complete | Qlik on-prem connector, Qlik Cloud connector, setup wizard, demo mode |
-| Phase 3 | Planned | Performance analysis, load script analysis, resource optimisation |
-| Phase 4 | Planned | Plugin architecture, community extensions |
+| Phase 3 | ✅ Complete | Performance analysis (PERF), Load Script analysis (LS), Resource Optimization (RO) |
+| Phase 4 | ✅ Complete | Plugin architecture — entry_points + local `plugins_dir`, naming convention example |
 | Phase 5 | Planned | Tableau and Power BI connectors |
 
 ---

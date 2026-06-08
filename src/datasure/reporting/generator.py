@@ -103,6 +103,10 @@ def _build_report_payload(
     # duplicate groups
     dup_groups = [i for i in all_issues if i["rule_id"] == "DUP001"]
 
+    # performance / load_script / resource_optimization issues
+    _PERF_VALIDATORS = {"performance", "load_script", "resource_optimization"}
+    perf_issues = [i for i in all_issues if i["validator"] in _PERF_VALIDATORS]
+
     # health score (0-100)
     total = summary.get("total_objects", 1) or 1
     errors = summary.get("total_errors", 0)
@@ -124,6 +128,7 @@ def _build_report_payload(
         "data_model": data_model,
         "field_usage": field_usage_rows,
         "dup_groups": dup_groups,
+        "perf_issues": perf_issues,
     }
 
 
@@ -284,6 +289,9 @@ def _page_flags(p: dict) -> str:
         "field_integrity": "Field Integrity",
         "data_model_health": "Data Model Health",
         "duplicates": "Duplicate Expressions",
+        "performance": "Performance Analysis",
+        "load_script": "Load Script Analysis",
+        "resource_optimization": "Resource Optimization",
     }
 
     sections = ""
@@ -542,16 +550,109 @@ def _page_duplicates(p: dict) -> str:
     {cards}"""
 
 
+def _page_performance(p: dict) -> str:
+    """Phase 3: Performance, Load Script, and Resource Optimization findings."""
+    issues = p.get("perf_issues", [])
+
+    _RULE_HELP = {
+        "PERF001": ("Sheet Density", "Too many visualizations on one sheet slows rendering."),
+        "PERF002": ("Nested Aggr()", "Nested Aggr() calls multiply query evaluation cost."),
+        "PERF003": ("Multiple Set Modifiers", "Multiple {<...>} modifiers in one expression are expensive."),
+        "PERF004": ("P()/E() Functions", "Possible/excluded set functions scan the full data model."),
+        "PERF005": ("App Scale", "Too many sheets impacts app open time."),
+        "LS001":   ("Orphaned Script Table", "Table defined in load script but absent from data model."),
+        "LS002":   ("Direct SQL Load", "SQL SELECT without a QVD layer reloads from source every time."),
+        "LS003":   ("INLINE Data", "Large INLINE blocks are not scalable."),
+        "LS004":   ("Star LOAD", "LOAD * FROM is fragile — explicit field lists are safer."),
+        "LS005":   ("Undocumented Script", "Script sections lack comments."),
+        "RO001":   ("No Master Measures", "App has many inline measures but no Master Measures."),
+        "RO002":   ("No Master Dimensions", "App has inline dimensions but no Master Dimensions."),
+        "RO003":   ("Unused Variable", "Variable defined but never referenced in expressions."),
+        "RO004":   ("Low Master Item Adoption", "Most measures are still inline despite some master items."),
+    }
+
+    _SECTION_GROUPS = {
+        "Performance Analysis": ["PERF001","PERF002","PERF003","PERF004","PERF005"],
+        "Load Script Analysis": ["LS001","LS002","LS003","LS004","LS005"],
+        "Resource Optimization": ["RO001","RO002","RO003","RO004"],
+    }
+
+    if not issues:
+        return """
+        <div class="page-header"><h2>Performance &amp; Optimization</h2></div>
+        <p class="empty">No performance or optimization issues found. Great work!</p>"""
+
+    sections_html = ""
+    for section_title, rule_ids in _SECTION_GROUPS.items():
+        grp = [i for i in issues if i["rule_id"] in rule_ids]
+        if not grp:
+            continue
+        rows = ""
+        for iss in grp:
+            det = iss.get("detail", {})
+            rule_name, rule_help = _RULE_HELP.get(iss["rule_id"], (iss["rule_id"], ""))
+            det_summary = ""
+            if "expression" in det:
+                det_summary = f'<code style="font-size:0.78rem;color:#666">{str(det["expression"])[:80]}{"…" if len(str(det.get("expression","")))>80 else ""}</code>'
+            elif det:
+                det_summary = " &nbsp; ".join(
+                    f'<span style="color:#888;font-size:0.8rem">{k}: <b>{v}</b></span>'
+                    for k, v in list(det.items())[:3]
+                )
+            rows += f"""
+            <tr>
+              <td>{_sev_badge(iss['severity'])}</td>
+              <td><code>{iss['rule_id']}</code></td>
+              <td><b>{rule_name}</b><br><span style="color:#888;font-size:0.8rem">{rule_help}</span></td>
+              <td><span class="obj-chip">{iss['object_type']}</span></td>
+              <td>{iss['message']}</td>
+              <td>{det_summary}</td>
+            </tr>"""
+
+        e = sum(1 for i in grp if i["severity"]=="error")
+        sections_html += f"""
+        <div class="flag-section" style="margin-bottom:1rem">
+          <div class="section-header" onclick="toggleSection(this)">
+            <span class="chevron">▼</span>
+            <b>{section_title}</b>
+            {_badge(str(e),"#e74c3c","#fdecea") + "&nbsp;" if e else ""}
+            <span style="color:#aaa;font-size:0.85rem">{len(grp)} finding{'s' if len(grp)!=1 else ''}</span>
+          </div>
+          <div class="section-body">
+            <table class="data-table">
+              <thead><tr><th>Sev</th><th>Rule</th><th>Category</th><th>Object</th><th>Message</th><th>Detail</th></tr></thead>
+              <tbody>{rows}</tbody>
+            </table>
+          </div>
+        </div>"""
+
+    total_e = sum(1 for i in issues if i["severity"]=="error")
+    total_w = sum(1 for i in issues if i["severity"]=="warning")
+    total_i = sum(1 for i in issues if i["severity"]=="info")
+
+    return f"""
+    <div class="page-header">
+      <h2>Performance &amp; Optimization</h2>
+      <p>{len(issues)} findings &mdash;
+         {_badge(str(total_e),'#e74c3c','#fdecea')} &nbsp;
+         {_badge(str(total_w),'#f39c12','#fef9e7')} &nbsp;
+         {_badge(str(total_i),'#3498db','#eaf4fb')}
+      </p>
+    </div>
+    {sections_html}"""
+
+
 # ── full app render ───────────────────────────────────────────────────────────
 
 def _render_app(payload: dict, title: str) -> str:
     pages = [
-        ("overview",    "📊", "Overview",       _page_overview(payload)),
-        ("flags",       "🚩", "Flags",           _page_flags(payload)),
-        ("data-model",  "🗄", "Data Model",      _page_data_model(payload)),
-        ("objects",     "📦", "Objects",         _page_objects(payload)),
-        ("field-usage", "🔗", "Field Usage",     _page_field_usage(payload)),
-        ("duplicates",  "♻",  "Duplicates",      _page_duplicates(payload)),
+        ("overview",    "📊", "Overview",             _page_overview(payload)),
+        ("flags",       "🚩", "Flags",                _page_flags(payload)),
+        ("data-model",  "🗄", "Data Model",           _page_data_model(payload)),
+        ("objects",     "📦", "Objects",              _page_objects(payload)),
+        ("field-usage", "🔗", "Field Usage",          _page_field_usage(payload)),
+        ("duplicates",  "♻",  "Duplicates",           _page_duplicates(payload)),
+        ("performance", "⚡", "Performance",          _page_performance(payload)),
     ]
 
     nav_items = "".join(
@@ -761,7 +862,7 @@ function filterFlags() {{
 // Boot — honour URL hash for direct linking and headless screenshots
 (function() {{
   var hash = window.location.hash.replace('#','');
-  var valid = ['overview','flags','data-model','objects','field-usage','duplicates'];
+  var valid = ['overview','flags','data-model','objects','field-usage','duplicates','performance'];
   showPage(valid.indexOf(hash) >= 0 ? hash : 'overview');
   window.addEventListener('hashchange', function() {{
     var h = window.location.hash.replace('#','');

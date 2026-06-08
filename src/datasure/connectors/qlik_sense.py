@@ -22,27 +22,120 @@ DEMO_APPS = [
     {"type": "app", "id": "demo-app-003", "name": "Supply Chain Monitor", "description": "Inventory and logistics tracking",          "published": False, "stream": "",           "owner": "INTERNAL\\bob.jones",    "last_reload": "2026-06-03T06:15:00Z"},
 ]
 
+_DEMO_LOAD_SCRIPT = """\
+// $tab Main
+// Config variables
+SET vDataPath = 'lib://DataFiles/';
+
+// $tab FactSales
+FactSales:
+LOAD
+    OrderID,
+    CustomerID,
+    ProductID,
+    Revenue,
+    OrderDate,
+    OrderValue
+FROM [lib://DataFiles/sales.csv] (txt, utf8, embedded labels, delimiter is ',');
+
+// $tab DimCustomer
+DimCustomer:
+LOAD
+    CustomerID,
+    Region,
+    CustomerName
+FROM [lib://DataFiles/customers.qvd] (qvd);
+
+// $tab DimProduct  -- no QVD layer, loading directly from DB
+DimProduct:
+SQL SELECT ProductID, CustomerID, ProductName FROM products_table;
+
+// $tab StagingTemp
+StagingTemp:
+LOAD * INLINE [
+    TempID, TempVal
+    1, Alpha
+    2, Beta
+    3, Gamma
+];
+
+// Orphaned table — loaded but never used in the data model
+OrphanedAuditLog:
+LOAD * FROM [lib://DataFiles/audit_old.qvd] (qvd);
+
+// LOAD * (star load) — fragile
+DimCategory:
+LOAD * FROM [lib://DataFiles/categories.qvd] (qvd);
+"""
+
+
 def _demo_objects(app_id: str) -> list[dict[str, Any]]:
+    # 17 cells on the crowded sheet to trigger PERF001 warning
+    crowded_cells = [{"type": "barchart"}] * 17
     return [
-        {"type": "app",       "id": app_id,       "name": "Sales Dashboard", "description": "Monthly sales KPIs"},
-        {"type": "variable",  "id": "var-001",     "name": "vSalesExpr",     "definition": "Sum(Revenue)"},
-        {"type": "variable",  "id": "var-002",     "name": "vCurrYear",      "definition": "Year(Today())"},
-        {"type": "sheet",     "id": "sheet-001",   "name": "Overview",       "title": "Executive Overview",     "cells": [{"type": "barchart"}, {"type": "kpi"}]},
-        {"type": "sheet",     "id": "sheet-002",   "name": "Empty Sheet",    "title": "Work In Progress",       "cells": []},
-        {"type": "measure",   "id": "master-001",  "name": "Total Revenue (Master)",  "expression": "Sum(Revenue)",        "label": "Total Revenue",  "is_master": True,  "number_format": {"fmt": "#,##0.00"}, "expected_type": "numeric"},
-        {"type": "measure",   "id": "meas-001",    "name": "Total Revenue",           "expression": "Sum(Revenue)",        "label": "Total Revenue",  "number_format": {"fmt": "#,##0.00"}, "expected_type": "numeric"},
-        {"type": "measure",   "id": "meas-001b",   "name": "Revenue Copy",            "expression": "Sum(Revenue)",        "label": "Revenue Copy",   "number_format": {"fmt": "#,##0.00"}, "expected_type": "numeric"},
-        {"type": "measure",   "id": "meas-001c",   "name": "Revenue via Var",         "expression": "$(vSalesExpr)",       "label": "Revenue (var)",  "number_format": {"fmt": "#,##0.00"}, "expected_type": "numeric"},
-        {"type": "measure",   "id": "meas-002",    "name": "Avg Order Value",         "expression": "Avg(OrderValue)",     "label": "",               "number_format": {},                  "expected_type": "numeric"},
-        {"type": "measure",   "id": "meas-003",    "name": "Broken Measure",          "expression": "   ",                 "label": "Broken",         "number_format": {},                  "expected_type": "numeric"},
-        {"type": "measure",   "id": "meas-005",    "name": "Ghost Metric",            "expression": "Sum(GhostField)",     "label": "Ghost",          "number_format": {},                  "expected_type": "numeric"},
-        {"type": "measure",   "id": "meas-006",    "name": "Set Analysis Bad",        "expression": "Sum({<DeletedStatus={'Active'}>} Revenue)", "label": "Bad Set", "number_format": {}, "expected_type": "numeric"},
-        {"type": "measure",   "id": "meas-007",    "name": "Count by Key",            "expression": "Count(CustomerID)",   "label": "Cust Count",     "number_format": {},                  "expected_type": "numeric"},
-        {"type": "measure",   "id": "meas-008",    "name": "Ref Deleted Master",      "expression": "Sum(Revenue)",        "label": "Old Master Ref", "master_item_id": "master-deleted-999", "number_format": {}, "expected_type": "numeric"},
-        {"type": "dimension", "id": "dim-001",     "name": "Region",         "field_def": "Region",   "tags": ["$ascii"]},
-        {"type": "dimension", "id": "dim-002",     "name": "Empty Dim",      "field_def": "",          "tags": []},
-        {"type": "visualization", "id": "viz-001", "name": "Revenue Bar",    "visualization_type": "barchart", "properties": {"title": "Revenue by Region"}},
-        {"type": "visualization", "id": "viz-002", "name": "Mystery Chart",  "visualization_type": "",         "properties": {"title": ""}},
+        {"type": "app", "id": app_id, "name": "Sales Dashboard",
+         "description": "Monthly sales KPIs", "sheet_count": 4,
+         "load_script": _DEMO_LOAD_SCRIPT},
+        # variables — vCurrYear is never used in any expression (triggers RO003)
+        {"type": "variable",  "id": "var-001", "name": "vSalesExpr", "definition": "Sum(Revenue)"},
+        {"type": "variable",  "id": "var-002", "name": "vCurrYear",  "definition": "Year(Today())"},
+        # sheets
+        {"type": "sheet", "id": "sheet-001", "name": "Overview",
+         "title": "Executive Overview", "cells": [{"type": "barchart"}, {"type": "kpi"}]},
+        {"type": "sheet", "id": "sheet-002", "name": "Empty Sheet",
+         "title": "Work In Progress", "cells": []},
+        {"type": "sheet", "id": "sheet-003", "name": "Crowded Detail",
+         "title": "Detail View", "cells": crowded_cells},
+        # master measures (only 1 out of many → RO004 low adoption)
+        {"type": "measure", "id": "master-001", "name": "Total Revenue (Master)",
+         "expression": "Sum(Revenue)", "label": "Total Revenue", "is_master": True,
+         "number_format": {"fmt": "#,##0.00"}, "expected_type": "numeric"},
+        # inline measures
+        {"type": "measure", "id": "meas-001",  "name": "Total Revenue",
+         "expression": "Sum(Revenue)", "label": "Total Revenue",
+         "number_format": {"fmt": "#,##0.00"}, "expected_type": "numeric"},
+        {"type": "measure", "id": "meas-001b", "name": "Revenue Copy",
+         "expression": "Sum(Revenue)", "label": "Revenue Copy",
+         "number_format": {"fmt": "#,##0.00"}, "expected_type": "numeric"},
+        {"type": "measure", "id": "meas-001c", "name": "Revenue via Var",
+         "expression": "$(vSalesExpr)", "label": "Revenue (var)",
+         "number_format": {"fmt": "#,##0.00"}, "expected_type": "numeric"},
+        {"type": "measure", "id": "meas-002",  "name": "Avg Order Value",
+         "expression": "Avg(OrderValue)", "label": "",
+         "number_format": {}, "expected_type": "numeric"},
+        {"type": "measure", "id": "meas-003",  "name": "Broken Measure",
+         "expression": "   ", "label": "Broken",
+         "number_format": {}, "expected_type": "numeric"},
+        {"type": "measure", "id": "meas-005",  "name": "Ghost Metric",
+         "expression": "Sum(GhostField)", "label": "Ghost",
+         "number_format": {}, "expected_type": "numeric"},
+        {"type": "measure", "id": "meas-006",  "name": "Set Analysis Bad",
+         "expression": "Sum({<DeletedStatus={'Active'}>} Revenue)", "label": "Bad Set",
+         "number_format": {}, "expected_type": "numeric"},
+        {"type": "measure", "id": "meas-007",  "name": "Count by Key",
+         "expression": "Count(CustomerID)", "label": "Cust Count",
+         "number_format": {}, "expected_type": "numeric"},
+        {"type": "measure", "id": "meas-008",  "name": "Ref Deleted Master",
+         "expression": "Sum(Revenue)", "label": "Old Master Ref",
+         "master_item_id": "master-deleted-999",
+         "number_format": {}, "expected_type": "numeric"},
+        # two Aggr() calls in one expression — triggers PERF002
+        {"type": "measure", "id": "meas-009",  "name": "Double Aggr",
+         "expression": "Aggr(Sum(Revenue), Region) + Aggr(Sum(OrderValue), ProductID)",
+         "label": "Double Aggr", "number_format": {}, "expected_type": "numeric"},
+        # P() set function — triggers PERF004
+        {"type": "measure", "id": "meas-010",  "name": "Expensive P()",
+         "expression": "Sum({<CustomerID=P({<Region={'North'}>}CustomerID)>}Revenue)",
+         "label": "P() Measure", "number_format": {}, "expected_type": "numeric"},
+        # dimensions
+        {"type": "dimension", "id": "dim-001", "name": "Region",    "field_def": "Region",   "tags": ["$ascii"]},
+        {"type": "dimension", "id": "dim-002", "name": "Empty Dim", "field_def": "",          "tags": []},
+        # visualizations
+        {"type": "visualization", "id": "viz-001", "name": "Revenue Bar",
+         "visualization_type": "barchart", "properties": {"title": "Revenue by Region"}},
+        {"type": "visualization", "id": "viz-002", "name": "Mystery Chart",
+         "visualization_type": "", "properties": {"title": ""}},
+        # data model
         {"type": "data_model", "id": app_id,
          "used_fields": {"revenue", "ordervalue", "orderdate", "region", "customerid"},
          "tables": [
@@ -56,8 +149,8 @@ def _demo_objects(app_id: str) -> list[dict[str, Any]]:
                 {"name": "LoadBatch",  "tags": ["$numeric"],          "is_key": False},
             ]},
             {"name": "DimCustomer", "fields": [
-                {"name": "CustomerID", "tags": ["$numeric"], "is_key": True},
-                {"name": "Region",     "tags": ["$ascii"],   "is_key": False},
+                {"name": "CustomerID",  "tags": ["$numeric"], "is_key": True},
+                {"name": "Region",      "tags": ["$ascii"],   "is_key": False},
             ]},
             {"name": "DimProduct",  "fields": [
                 {"name": "ProductID",   "tags": ["$numeric"], "is_key": True},

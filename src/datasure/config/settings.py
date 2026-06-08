@@ -38,11 +38,21 @@ class ValidationSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="DATASURE_VALIDATION_")
 
     enabled_modules: list[str] = Field(
-        default=["syntax", "data_types", "field_integrity", "data_model_health", "duplicates"],
+        default=[
+            "syntax",
+            "data_types",
+            "field_integrity",
+            "data_model_health",
+            "duplicates",
+            "performance",
+            "load_script",
+            "resource_optimization",
+        ],
         description="Active validation modules",
     )
     fail_fast: bool = False
     max_workers: int = 4
+    plugins_dir: Path | None = None
 
 
 class ReportSettings(BaseSettings):

@@ -758,8 +758,16 @@ function filterFlags() {{
   }});
 }}
 
-// Boot
-showPage('overview');
+// Boot — honour URL hash for direct linking and headless screenshots
+(function() {{
+  var hash = window.location.hash.replace('#','');
+  var valid = ['overview','flags','data-model','objects','field-usage','duplicates'];
+  showPage(valid.indexOf(hash) >= 0 ? hash : 'overview');
+  window.addEventListener('hashchange', function() {{
+    var h = window.location.hash.replace('#','');
+    if (valid.indexOf(h) >= 0) showPage(h);
+  }});
+}})();
 </script>
 </body>
 </html>"""

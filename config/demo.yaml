@@ -1,0 +1,16 @@
+qlik:
+  mode: demo
+
+validation:
+  enabled_modules:
+    - syntax
+    - data_types
+    - field_integrity
+    - data_model_health
+    - duplicates
+
+report:
+  output_dir: ./reports
+  formats:
+    - html
+    - json

@@ -1,0 +1,40 @@
+# DataSure — Qlik Sense Enterprise on Windows
+# Copy this file, fill in your values, then run:
+#   datasure test-connection --config enterprise.yaml
+#   datasure list-apps       --config enterprise.yaml
+#   datasure validate <APP_ID> --config enterprise.yaml
+
+qlik:
+  mode: enterprise
+  host: "qlik.yourcompany.com"   # hostname or IP of your Qlik Sense server
+  port: 443                       # 443 for HTTPS, 4242 for direct QRS access
+  virtual_proxy: ""               # leave blank for default; use "header" or "jwt" if configured
+
+  # Certificate paths — export from Qlik Management Console → Certificates
+  # QMC → your node → Actions → Export certificates → select "Platform: Linux/Mac"
+  # Extracts: root.pem, client.pem, client_key.pem
+  ca_cert:   "~/qlik-certs/root.pem"
+  cert_path: "~/qlik-certs/client.pem"
+  key_path:  "~/qlik-certs/client_key.pem"
+  verify_ssl: true
+
+  # Service account used for QRS calls (default works for most installs)
+  user_directory: "INTERNAL"
+  user_id: "sa_repository"
+
+  timeout: 30
+  retries: 3
+
+validation:
+  enabled_modules:
+    - syntax
+    - data_types
+    - field_integrity
+    - data_model_health
+    - duplicates
+
+report:
+  output_dir: "./reports"
+  formats: ["html", "json"]
+
+log_level: INFO

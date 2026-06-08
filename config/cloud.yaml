@@ -1,0 +1,31 @@
+# DataSure — Qlik Cloud (SaaS)
+# Copy this file, fill in your values, then run:
+#   datasure test-connection --config cloud.yaml
+#   datasure list-apps       --config cloud.yaml
+#   datasure validate <APP_ID> --config cloud.yaml
+
+qlik:
+  mode: cloud
+  tenant: "yourcompany.us.qlikcloud.com"  # your full tenant hostname
+
+  # API Key — generate in Qlik Cloud:
+  # Profile menu → API Keys → Generate new key
+  # Give it "App" scope (read access is enough)
+  api_key: "eyJhbGciOiJFUzM4NCIsImtpZCI6..."
+
+  timeout: 30
+  retries: 3
+
+validation:
+  enabled_modules:
+    - syntax
+    - data_types
+    - field_integrity
+    - data_model_health
+    - duplicates
+
+report:
+  output_dir: "./reports"
+  formats: ["html", "json"]
+
+log_level: INFO
